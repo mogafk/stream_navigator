@@ -1,7 +1,8 @@
 {
   "debug180Key": "F3",
   "debugStunKey": "F2",
-  "debugTime": "60s",
-  "turnDistance": 5000,
+  "stunTime": "10s",
+  "turnDistance": 2000,
+  "triggerInterval": "5s",
   "twitchLink": "https://www.twitch.tv/podushkamonster"
 }

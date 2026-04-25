@@ -11,17 +11,19 @@ import (
 type Config struct {
 	Debug180Key  string `json:"debug180Key"`
 	DebugStunKey string `json:"debugStunKey"`
-	DebugTime    string `json:"debugTime"`
+	StunTime     string `json:"stunTime"`
 	TurnDistance int32  `json:"turnDistance"`
-	TwitchLink   string `json:"twitchLink"`
+	TriggerInterval string `json:"triggerInterval"`
+	TwitchLink      string `json:"twitchLink"`
 }
 
 var (
 	cfg           Config
 	cfgTurnKey    uint32
 	cfgStunKey    uint32
-	cfgStunTime   time.Duration
-	cfgTwitchChan string
+	cfgStunTime        time.Duration
+	cfgTriggerInterval time.Duration
+	cfgTwitchChan      string
 	cfgTurnDist   int32
 )
 
@@ -46,17 +48,28 @@ func loadConfig() {
 	cfgTurnKey = parseKeyName(cfg.Debug180Key)
 	cfgStunKey = parseKeyName(cfg.DebugStunKey)
 
-	if cfg.DebugTime == "" {
+	if cfg.StunTime == "" {
 		cfgStunTime = 60 * time.Second
 	} else {
-		cfgStunTime, err = time.ParseDuration(cfg.DebugTime)
+		cfgStunTime, err = time.ParseDuration(cfg.StunTime)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, `invalid debugTime — use e.g. "60s" or "1m30s":`, err)
+			fmt.Fprintln(os.Stderr, `invalid stunTime — use e.g. "60s" or "1m30s":`, err)
 			os.Exit(1)
 		}
 	}
 
 	cfgTurnDist = cfg.TurnDistance
+
+	if cfg.TriggerInterval == "" {
+		cfgTriggerInterval = 0
+	} else {
+		cfgTriggerInterval, err = time.ParseDuration(cfg.TriggerInterval)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, `invalid triggerInterval — use e.g. "5s" or "500ms":`, err)
+			os.Exit(1)
+		}
+	}
+
 	cfgTwitchChan = channelFromURL(cfg.TwitchLink)
 }
 

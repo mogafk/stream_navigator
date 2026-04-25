@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
@@ -19,18 +20,22 @@ func main() {
 	fmt.Println("Stream Navigator")
 	fmt.Printf("  turn  : key=%s | chat=%s | distance=%d px\n", keyLabel(cfg.Debug180Key), chatCommand, cfgTurnDist)
 	fmt.Printf("  стан  : key=%s | chat=%s | duration=%s\n", keyLabel(cfg.DebugStunKey), chatStunCmd, cfgStunTime)
-	fmt.Printf("  twitch: #%s\n", cfgTwitchChan)
+	delayLabel := "instant"
+	if cfgTriggerInterval > 0 {
+		delayLabel = cfgTriggerInterval.String()
+	}
+	fmt.Printf("  twitch: #%s | delay=%s\n", cfgTwitchChan, delayLabel)
 	fmt.Println("Ctrl+C to quit")
 
 	if cfgTwitchChan != "" {
 		go connectTwitch(cfgTwitchChan, func(username, msg string) {
 			switch strings.ToLower(strings.TrimSpace(msg)) {
 			case chatCommand:
-				fmt.Printf("[chat] %s → 180°\n", username)
-				moveMouse180()
+				fmt.Printf("[chat] %s → 180° (через %s)\n", username, cfgTriggerInterval)
+				time.AfterFunc(cfgTriggerInterval, moveMouse180)
 			case chatStunCmd:
-				fmt.Printf("[chat] %s → стан\n", username)
-				activateStun()
+				fmt.Printf("[chat] %s → стан (через %s)\n", username, cfgTriggerInterval)
+				time.AfterFunc(cfgTriggerInterval, activateStun)
 			}
 		})
 	}
