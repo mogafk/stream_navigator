@@ -27,6 +27,8 @@ func main() {
 	fmt.Printf("  twitch: #%s | delay=%s\n", cfgTwitchChan, delayLabel)
 	fmt.Println("Ctrl+C to quit")
 
+	go watchConfig()
+
 	if cfgTwitchChan != "" {
 		go connectTwitch(cfgTwitchChan, func(username, msg string) {
 			switch strings.ToLower(strings.TrimSpace(msg)) {

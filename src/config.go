@@ -9,84 +9,122 @@ import (
 )
 
 type Config struct {
-	Debug180Key  string `json:"debug180Key"`
-	DebugStunKey string `json:"debugStunKey"`
-	StunTime     string `json:"stunTime"`
-	TurnDistance int32  `json:"turnDistance"`
+	Debug180Key     string `json:"debug180Key"`
+	DebugStunKey    string `json:"debugStunKey"`
+	StunTime        string `json:"stunTime"`
+	TurnDistance    int32  `json:"turnDistance"`
 	TriggerInterval string `json:"triggerInterval"`
 	Mute            bool   `json:"mute"`
 	TwitchLink      string `json:"twitchLink"`
 }
 
 var (
-	cfg           Config
-	cfgTurnKey    uint32
-	cfgStunKey    uint32
+	cfg                Config
+	cfgTurnKey         uint32
+	cfgStunKey         uint32
 	cfgStunTime        time.Duration
 	cfgTriggerInterval time.Duration
 	cfgTwitchChan      string
-	cfgTurnDist   int32
+	cfgTurnDist        int32
 )
 
-// keyNames maps human-readable key names to Windows virtual key codes.
 var keyNames = map[string]uint32{
 	"F1": 0x70, "F2": 0x71, "F3": 0x72, "F4": 0x73,
 	"F5": 0x74, "F6": 0x75, "F7": 0x76, "F8": 0x77,
 	"F9": 0x78, "F10": 0x79, "F11": 0x7A, "F12": 0x7B,
 }
 
-func loadConfig() {
+// parseConfig reads and validates config.json, applying values to globals.
+// Returns an error without modifying globals if anything is invalid.
+func parseConfig() error {
 	data, err := os.ReadFile("config.json")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "cannot read config.json:", err)
-		os.Exit(1)
+		return err
 	}
-	if err = json.Unmarshal(data, &cfg); err != nil {
-		fmt.Fprintln(os.Stderr, "invalid config.json:", err)
-		os.Exit(1)
+	var c Config
+	if err = json.Unmarshal(data, &c); err != nil {
+		return err
 	}
 
-	cfgTurnKey = parseKeyName(cfg.Debug180Key)
-	cfgStunKey = parseKeyName(cfg.DebugStunKey)
+	turnKey, err := parseKeyName(c.Debug180Key)
+	if err != nil {
+		return err
+	}
+	stunKey, err := parseKeyName(c.DebugStunKey)
+	if err != nil {
+		return err
+	}
 
-	if cfg.StunTime == "" {
-		cfgStunTime = 60 * time.Second
-	} else {
-		cfgStunTime, err = time.ParseDuration(cfg.StunTime)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, `invalid stunTime — use e.g. "60s" or "1m30s":`, err)
-			os.Exit(1)
+	stunTime := 60 * time.Second
+	if c.StunTime != "" {
+		if stunTime, err = time.ParseDuration(c.StunTime); err != nil {
+			return fmt.Errorf("invalid stunTime: %w", err)
 		}
 	}
 
-	cfgTurnDist = cfg.TurnDistance
-
-	if cfg.TriggerInterval == "" {
-		cfgTriggerInterval = 0
-	} else {
-		cfgTriggerInterval, err = time.ParseDuration(cfg.TriggerInterval)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, `invalid triggerInterval — use e.g. "5s" or "500ms":`, err)
-			os.Exit(1)
+	var triggerInterval time.Duration
+	if c.TriggerInterval != "" {
+		if triggerInterval, err = time.ParseDuration(c.TriggerInterval); err != nil {
+			return fmt.Errorf("invalid triggerInterval: %w", err)
 		}
 	}
 
-	cfgTwitchChan = channelFromURL(cfg.TwitchLink)
+	// All values valid — apply atomically
+	cfg = c
+	cfgTurnKey = turnKey
+	cfgStunKey = stunKey
+	cfgStunTime = stunTime
+	cfgTriggerInterval = triggerInterval
+	cfgTurnDist = c.TurnDistance
+	cfgTwitchChan = channelFromURL(c.TwitchLink)
+	return nil
 }
 
-func parseKeyName(name string) uint32 {
+// loadConfig is used at startup — exits on error.
+func loadConfig() {
+	if err := parseConfig(); err != nil {
+		fmt.Fprintln(os.Stderr, "config error:", err)
+		os.Exit(1)
+	}
+}
+
+// reloadConfig is used by the file watcher — logs error and keeps old config.
+func reloadConfig() {
+	if err := parseConfig(); err != nil {
+		fmt.Fprintln(os.Stderr, "[config] reload failed:", err)
+		return
+	}
+	fmt.Println("[config] reloaded")
+}
+
+// watchConfig polls config.json every second and reloads on change.
+func watchConfig() {
+	info, err := os.Stat("config.json")
+	if err != nil {
+		return
+	}
+	lastMod := info.ModTime()
+	for range time.Tick(time.Second) {
+		info, err := os.Stat("config.json")
+		if err != nil || !info.ModTime().After(lastMod) {
+			continue
+		}
+		lastMod = info.ModTime()
+		reloadConfig()
+	}
+}
+
+func parseKeyName(name string) (uint32, error) {
 	if name == "" {
-		return 0
+		return 0, nil
 	}
 	vk, ok := keyNames[strings.ToUpper(name)]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown key %q — supported: F1–F12\n", name)
-		os.Exit(1)
+		return 0, fmt.Errorf("unknown key %q — supported: F1–F12", name)
 	}
-	return vk
+	return vk, nil
 }
 
-// channelFromURL extracts "podushkamonster" from "https://www.twitch.tv/podushkamonster".
 func channelFromURL(url string) string {
 	s := strings.TrimRight(url, "/")
 	if idx := strings.LastIndex(s, "/"); idx >= 0 {
