@@ -68,6 +68,7 @@ func activateStun() {
 		return // already active
 	}
 	fmt.Printf("[stun] клавиши заблокированы на %s\n", cfgStunTime)
+	playSound("sounds/stun.mp3")
 	time.AfterFunc(cfgStunTime, func() {
 		stunned.Store(false)
 		fmt.Println("[stun] клавиши разблокированы")
@@ -75,6 +76,7 @@ func activateStun() {
 }
 
 func moveMouse180() {
+	playSound("sounds/180.mp3")
 	ev := mouseInputEvent{
 		inputType: inputMouse,
 		dx:        cfgTurnDist,

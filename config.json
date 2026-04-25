@@ -4,5 +4,6 @@
   "stunTime": "10s",
   "turnDistance": 2000,
   "triggerInterval": "5s",
+  "mute": true,
   "twitchLink": "https://www.twitch.tv/podushkamonster"
 }

@@ -18,7 +18,9 @@
   "stunTime": "10s",
   // Сила поворат мыши, из-за разного DPI проще подобрать на глаз
   "turnDistance": 5000,
-  "twitchLink": "https://www.twitch.tv/podushkamonster"
+  "twitchLink": "https://www.twitch.tv/podushkamonster",
+  // true - проигрывать музыкальные файлы, false - 
+  "mute": false,
 }
 ```
 

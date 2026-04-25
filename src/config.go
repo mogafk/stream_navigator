@@ -14,6 +14,7 @@ type Config struct {
 	StunTime     string `json:"stunTime"`
 	TurnDistance int32  `json:"turnDistance"`
 	TriggerInterval string `json:"triggerInterval"`
+	Mute            bool   `json:"mute"`
 	TwitchLink      string `json:"twitchLink"`
 }
 
