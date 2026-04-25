@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -11,8 +12,10 @@ import (
 
 const (
 	whKeyboardLL   = 13
+	whMouseLL      = 14
 	wmKeyDown      = 0x0100
 	wmSysKeyDown   = 0x0104
+	wmMouseMove    = 0x0200
 	inputMouse     = 0
 	inputKeyboard  = 1
 	mouseEventMove = 0x0001
@@ -34,10 +37,33 @@ var (
 	procSendInput           = user32.NewProc("SendInput")
 	procGetAsyncKeyState    = user32.NewProc("GetAsyncKeyState")
 	procGetModuleHandleW    = kernel32.NewProc("GetModuleHandleW")
+	procBlockInput          = user32.NewProc("BlockInput")
 
-	hhook   uintptr
-	stunned atomic.Bool
+	hhook        uintptr
+	hmousehook   uintptr
+	stunned      atomic.Bool
+	blockInputCh = make(chan bool, 1)
 )
+
+func init() {
+	go func() {
+		runtime.LockOSThread()
+		// Probe: BlockInput(false) is safe to call anytime and tells us if we have admin.
+		ret, _, _ := procBlockInput.Call(0)
+		if ret != 0 {
+			fmt.Println("[stun] режим администратора: Raw Input мыши тоже будет заблокирован")
+		} else {
+			fmt.Println("[stun] без администратора: блокируются только Win32-клики (WH_MOUSE_LL)")
+		}
+		for block := range blockInputCh {
+			val := uintptr(0)
+			if block {
+				val = 1
+			}
+			procBlockInput.Call(val)
+		}
+	}()
+}
 
 type kbdllHookStruct struct {
 	vkCode      uint32
@@ -92,8 +118,6 @@ func releaseAllKeys() {
 		if state&0x8000 == 0 {
 			continue
 		}
-		fmt.Printf("[keyboard] Release key %d\n", vk)
-
 		ev := keyInputEvent{
 			inputType:   inputKeyboard,
 			wVk:         uint16(vk),
@@ -109,11 +133,13 @@ func activateStun() {
 		return // already active
 	}
 	releaseAllKeys()
-	fmt.Printf("[stun] клавиши заблокированы на %s\n", cfgStunTime)
+	blockInputCh <- true
+	fmt.Printf("[stun] клавиши и кнопки мыши заблокированы на %s\n", cfgStunTime)
 	playSound("sounds/stun.mp3")
 	time.AfterFunc(cfgStunTime, func() {
+		blockInputCh <- false
 		stunned.Store(false)
-		fmt.Println("[stun] клавиши разблокированы")
+		fmt.Println("[stun] клавиши и кнопки мыши разблокированы")
 	})
 }
 
@@ -158,15 +184,33 @@ func hookCallback(nCode int, wParam, lParam uintptr) uintptr {
 	return r
 }
 
+func mouseHookCallback(nCode int, wParam, lParam uintptr) uintptr {
+	// Block all mouse events except movement during stun.
+	if nCode >= 0 && stunned.Load() && wParam != wmMouseMove {
+		return 1
+	}
+	r, _, _ := procCallNextHookEx.Call(hmousehook, uintptr(nCode), wParam, lParam)
+	return r
+}
+
 func runKeyboardHook() {
 	hInst, _, _ := procGetModuleHandleW.Call(0)
-	cb := syscall.NewCallback(hookCallback)
-	h, _, err := procSetWindowsHookEx.Call(whKeyboardLL, cb, hInst, 0)
+
+	kbCb := syscall.NewCallback(hookCallback)
+	h, _, err := procSetWindowsHookEx.Call(whKeyboardLL, kbCb, hInst, 0)
 	if h == 0 {
-		fmt.Fprintln(os.Stderr, "SetWindowsHookEx failed:", err)
+		fmt.Fprintln(os.Stderr, "SetWindowsHookEx (keyboard) failed:", err)
 		os.Exit(1)
 	}
 	hhook = h
+
+	mCb := syscall.NewCallback(mouseHookCallback)
+	mh, _, err := procSetWindowsHookEx.Call(whMouseLL, mCb, hInst, 0)
+	if mh == 0 {
+		fmt.Fprintln(os.Stderr, "SetWindowsHookEx (mouse) failed:", err)
+		os.Exit(1)
+	}
+	hmousehook = mh
 
 	var m winMsg
 	for {
@@ -176,8 +220,10 @@ func runKeyboardHook() {
 		}
 	}
 	procUnhookWindowsHookEx.Call(hhook)
+	procUnhookWindowsHookEx.Call(hmousehook)
 }
 
 func stopKeyboardHook() {
 	procUnhookWindowsHookEx.Call(hhook)
+	procUnhookWindowsHookEx.Call(hmousehook)
 }

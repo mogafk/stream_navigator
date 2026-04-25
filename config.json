@@ -1,6 +1,6 @@
 {
-  "debug180Key": "",
-  "debugStunKey": "",
+  "debug180Key": "F2",
+  "debugStunKey": "F3",
   "stunTime": "10s",
   "turnDistance": 2000,
   "mute": false,
