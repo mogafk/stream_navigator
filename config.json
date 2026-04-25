@@ -3,7 +3,8 @@
   "debugStunKey": "",
   "stunTime": "10s",
   "turnDistance": 2000,
-  "triggerInterval": "5s",
   "mute": false,
+  "cooldown180": "30s",
+  "cooldownStun": "1m",
   "twitchLink": "https://www.twitch.tv/podushkamonster"
 }

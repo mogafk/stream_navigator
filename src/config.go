@@ -13,8 +13,9 @@ type Config struct {
 	DebugStunKey    string `json:"debugStunKey"`
 	StunTime        string `json:"stunTime"`
 	TurnDistance    int32  `json:"turnDistance"`
-	TriggerInterval string `json:"triggerInterval"`
 	Mute            bool   `json:"mute"`
+	Cooldown180     string `json:"cooldown180"`
+	CooldownStun    string `json:"cooldownStun"`
 	TwitchLink      string `json:"twitchLink"`
 }
 
@@ -23,7 +24,8 @@ var (
 	cfgTurnKey         uint32
 	cfgStunKey         uint32
 	cfgStunTime        time.Duration
-	cfgTriggerInterval time.Duration
+	cfgCooldown180     time.Duration
+	cfgCooldownStun    time.Duration
 	cfgTwitchChan      string
 	cfgTurnDist        int32
 )
@@ -62,10 +64,15 @@ func parseConfig() error {
 		}
 	}
 
-	var triggerInterval time.Duration
-	if c.TriggerInterval != "" {
-		if triggerInterval, err = time.ParseDuration(c.TriggerInterval); err != nil {
-			return fmt.Errorf("invalid triggerInterval: %w", err)
+	var cooldown180, cooldownStun time.Duration
+	if c.Cooldown180 != "" {
+		if cooldown180, err = time.ParseDuration(c.Cooldown180); err != nil {
+			return fmt.Errorf("invalid cooldown180: %w", err)
+		}
+	}
+	if c.CooldownStun != "" {
+		if cooldownStun, err = time.ParseDuration(c.CooldownStun); err != nil {
+			return fmt.Errorf("invalid cooldownStun: %w", err)
 		}
 	}
 
@@ -74,7 +81,8 @@ func parseConfig() error {
 	cfgTurnKey = turnKey
 	cfgStunKey = stunKey
 	cfgStunTime = stunTime
-	cfgTriggerInterval = triggerInterval
+	cfgCooldown180 = cooldown180
+	cfgCooldownStun = cooldownStun
 	cfgTurnDist = c.TurnDistance
 	cfgTwitchChan = channelFromURL(c.TwitchLink)
 	return nil

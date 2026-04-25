@@ -59,7 +59,7 @@ func ircSession(channel string, onMessage func(username, msg string)) error {
 			continue
 		}
 
-		fmt.Printf("[chat] %s: %s\n", username, msg)
+		fmt.Printf("[chat] get message %s: %s\n", username, msg)
 		onMessage(username, msg)
 	}
 
