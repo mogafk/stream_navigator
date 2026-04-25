@@ -9,25 +9,28 @@ import (
 )
 
 type Config struct {
-	Debug180Key     string `json:"debug180Key"`
-	DebugStunKey    string `json:"debugStunKey"`
-	StunTime        string `json:"stunTime"`
-	TurnDistance    int32  `json:"turnDistance"`
-	Mute            bool   `json:"mute"`
-	Cooldown180     string `json:"cooldown180"`
-	CooldownStun    string `json:"cooldownStun"`
-	TwitchLink      string `json:"twitchLink"`
+	Debug180Key      string `json:"debug180Key"`
+	DebugStunKey     string `json:"debugStunKey"`
+	StunTime         string `json:"stunTime"`
+	TurnDistance     int32  `json:"turnDistance"`
+	TurnModificator  string `json:"turnModificator"`
+	Mute             bool   `json:"mute"`
+	Cooldown180      string `json:"cooldown180"`
+	CooldownStun     string `json:"cooldownStun"`
+	TwitchLink       string `json:"twitchLink"`
 }
 
 var (
-	cfg                Config
-	cfgTurnKey         uint32
-	cfgStunKey         uint32
-	cfgStunTime        time.Duration
-	cfgCooldown180     time.Duration
-	cfgCooldownStun    time.Duration
-	cfgTwitchChan      string
-	cfgTurnDist        int32
+	cfg             Config
+	cfgTurnKey      uint32
+	cfgStunKey      uint32
+	cfgStunTime     time.Duration
+	cfgCooldown180  time.Duration
+	cfgCooldownStun time.Duration
+	cfgTwitchChan   string
+	cfgTurnDist     int32
+	cfgTurnModDown  uint32
+	cfgTurnModUp    uint32
 )
 
 var keyNames = map[string]uint32{
@@ -76,6 +79,18 @@ func parseConfig() error {
 		}
 	}
 
+	var turnModDown, turnModUp uint32
+	switch strings.ToUpper(c.TurnModificator) {
+	case "PMB":
+		turnModDown, turnModUp = mouseEventLeftDown, mouseEventLeftUp
+	case "SMB":
+		turnModDown, turnModUp = mouseEventRightDown, mouseEventRightUp
+	case "":
+		// no button held during turn
+	default:
+		return fmt.Errorf("invalid turnModificator %q — use PMB or SMB", c.TurnModificator)
+	}
+
 	// All values valid — apply atomically
 	cfg = c
 	cfgTurnKey = turnKey
@@ -84,6 +99,8 @@ func parseConfig() error {
 	cfgCooldown180 = cooldown180
 	cfgCooldownStun = cooldownStun
 	cfgTurnDist = c.TurnDistance
+	cfgTurnModDown = turnModDown
+	cfgTurnModUp = turnModUp
 	cfgTwitchChan = channelFromURL(c.TwitchLink)
 	return nil
 }

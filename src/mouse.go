@@ -18,8 +18,12 @@ const (
 	wmMouseMove    = 0x0200
 	inputMouse     = 0
 	inputKeyboard  = 1
-	mouseEventMove = 0x0001
-	keyEventKeyUp  = 0x0002
+	mouseEventMove      = 0x0001
+	mouseEventLeftDown  = 0x0002
+	mouseEventLeftUp    = 0x0004
+	mouseEventRightDown = 0x0008
+	mouseEventRightUp   = 0x0010
+	keyEventKeyUp       = 0x0002
 
 	// stunReleaseTag marks synthetic KEYUP events sent by releaseAllKeys so the
 	// hook can identify and pass them through even while stunned is true.
@@ -38,6 +42,8 @@ var (
 	procGetAsyncKeyState    = user32.NewProc("GetAsyncKeyState")
 	procGetModuleHandleW    = kernel32.NewProc("GetModuleHandleW")
 	procBlockInput          = user32.NewProc("BlockInput")
+	procGetCursorPos        = user32.NewProc("GetCursorPos")
+	procSetCursorPos        = user32.NewProc("SetCursorPos")
 
 	hhook        uintptr
 	hmousehook   uintptr
@@ -64,6 +70,8 @@ func init() {
 		}
 	}()
 }
+
+type point struct{ x, y int32 }
 
 type kbdllHookStruct struct {
 	vkCode      uint32
@@ -145,12 +153,24 @@ func activateStun() {
 
 func moveMouse180() {
 	playSound("sounds/180.mp3")
-	ev := mouseInputEvent{
-		inputType: inputMouse,
-		dx:        cfgTurnDist,
-		dwFlags:   mouseEventMove,
-	}
-	procSendInput.Call(1, uintptr(unsafe.Pointer(&ev)), unsafe.Sizeof(ev))
+	go func() {
+		send := func(flags uint32, dx int32) {
+			ev := mouseInputEvent{inputType: inputMouse, dx: dx, dwFlags: flags}
+			procSendInput.Call(1, uintptr(unsafe.Pointer(&ev)), unsafe.Sizeof(ev))
+		}
+		if cfgTurnModDown != 0 {
+			var p point
+			procGetCursorPos.Call(uintptr(unsafe.Pointer(&p)))
+			send(cfgTurnModDown, 0)
+			time.Sleep(32 * time.Millisecond)
+			send(mouseEventMove, cfgTurnDist)
+			time.Sleep(32 * time.Millisecond)
+			send(cfgTurnModUp, 0)
+			procSetCursorPos.Call(uintptr(p.x), uintptr(p.y))
+		} else {
+			send(mouseEventMove, cfgTurnDist)
+		}
+	}()
 }
 
 func hookCallback(nCode int, wParam, lParam uintptr) uintptr {
