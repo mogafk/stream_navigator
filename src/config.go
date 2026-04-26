@@ -31,6 +31,7 @@ var (
 	cfgTurnDist     int32
 	cfgTurnModDown  uint32
 	cfgTurnModUp    uint32
+	cfgTurnModVK    uint32
 )
 
 var keyNames = map[string]uint32{
@@ -79,12 +80,12 @@ func parseConfig() error {
 		}
 	}
 
-	var turnModDown, turnModUp uint32
+	var turnModDown, turnModUp, turnModVK uint32
 	switch strings.ToUpper(c.TurnModificator) {
 	case "PMB":
-		turnModDown, turnModUp = mouseEventLeftDown, mouseEventLeftUp
+		turnModDown, turnModUp, turnModVK = mouseEventLeftDown, mouseEventLeftUp, 0x01
 	case "SMB":
-		turnModDown, turnModUp = mouseEventRightDown, mouseEventRightUp
+		turnModDown, turnModUp, turnModVK = mouseEventRightDown, mouseEventRightUp, 0x02
 	case "":
 		// no button held during turn
 	default:
@@ -101,6 +102,7 @@ func parseConfig() error {
 	cfgTurnDist = c.TurnDistance
 	cfgTurnModDown = turnModDown
 	cfgTurnModUp = turnModUp
+	cfgTurnModVK = turnModVK
 	cfgTwitchChan = channelFromURL(c.TwitchLink)
 	return nil
 }

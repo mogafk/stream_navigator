@@ -162,33 +162,43 @@ func moveMouse180() {
 			procSendInput.Call(1, uintptr(unsafe.Pointer(&ev)), unsafe.Sizeof(ev))
 		}
 		if cfgTurnModDown != 0 {
-			var p point
-			procGetCursorPos.Call(uintptr(unsafe.Pointer(&p)))
+			state, _, _ := procGetAsyncKeyState.Call(uintptr(cfgTurnModVK))
+			userHolding := state&0x8000 != 0
 
-			hwnd, _, _ := procGetForegroundWindow.Call()
-			var r rect
-			procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
-			procSetCursorPos.Call(uintptr(r.left), uintptr(r.top))
-
-			send(cfgTurnModDown, 0)
-			time.Sleep(32 * time.Millisecond)
 			const (
 				turnDuration = 100 * time.Millisecond
 				stepInterval = 16 * time.Millisecond
 				turnSteps    = int(turnDuration / stepInterval)
 			)
-			dxPerStep := float64(cfgTurnDist) / float64(turnSteps)
-			var acc float64
-			for i := 0; i < turnSteps; i++ {
-				acc += dxPerStep
-				dx := int32(acc)
-				acc -= float64(dx)
-				send(mouseEventMove, dx)
-				time.Sleep(stepInterval)
+
+			doSteps := func() {
+				dxPerStep := float64(cfgTurnDist) / float64(turnSteps)
+				var acc float64
+				for i := 0; i < turnSteps; i++ {
+					acc += dxPerStep
+					dx := int32(acc)
+					acc -= float64(dx)
+					send(mouseEventMove, dx)
+					time.Sleep(stepInterval)
+				}
 			}
-			send(cfgTurnModUp, 0)
-			time.Sleep(32 * time.Millisecond)
-			procSetCursorPos.Call(uintptr(p.x), uintptr(p.y))
+
+			if userHolding {
+				doSteps()
+			} else {
+				var p point
+				procGetCursorPos.Call(uintptr(unsafe.Pointer(&p)))
+				hwnd, _, _ := procGetForegroundWindow.Call()
+				var r rect
+				procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
+				procSetCursorPos.Call(uintptr(r.left), uintptr(r.top))
+				send(cfgTurnModDown, 0)
+				time.Sleep(32 * time.Millisecond)
+				doSteps()
+				send(cfgTurnModUp, 0)
+				time.Sleep(32 * time.Millisecond)
+				procSetCursorPos.Call(uintptr(p.x), uintptr(p.y))
+			}
 		} else {
 			send(mouseEventMove, cfgTurnDist)
 		}
