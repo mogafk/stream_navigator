@@ -11,13 +11,13 @@ import (
 )
 
 const (
-	whKeyboardLL   = 13
-	whMouseLL      = 14
-	wmKeyDown      = 0x0100
-	wmSysKeyDown   = 0x0104
-	wmMouseMove    = 0x0200
-	inputMouse     = 0
-	inputKeyboard  = 1
+	whKeyboardLL        = 13
+	whMouseLL           = 14
+	wmKeyDown           = 0x0100
+	wmSysKeyDown        = 0x0104
+	wmMouseMove         = 0x0200
+	inputMouse          = 0
+	inputKeyboard       = 1
 	mouseEventMove      = 0x0001
 	mouseEventLeftDown  = 0x0002
 	mouseEventLeftUp    = 0x0004
@@ -44,6 +44,8 @@ var (
 	procBlockInput          = user32.NewProc("BlockInput")
 	procGetCursorPos        = user32.NewProc("GetCursorPos")
 	procSetCursorPos        = user32.NewProc("SetCursorPos")
+	procGetForegroundWindow = user32.NewProc("GetForegroundWindow")
+	procGetWindowRect       = user32.NewProc("GetWindowRect")
 
 	hhook        uintptr
 	hmousehook   uintptr
@@ -72,6 +74,7 @@ func init() {
 }
 
 type point struct{ x, y int32 }
+type rect struct{ left, top, right, bottom int32 }
 
 type kbdllHookStruct struct {
 	vkCode      uint32
@@ -161,11 +164,30 @@ func moveMouse180() {
 		if cfgTurnModDown != 0 {
 			var p point
 			procGetCursorPos.Call(uintptr(unsafe.Pointer(&p)))
+
+			hwnd, _, _ := procGetForegroundWindow.Call()
+			var r rect
+			procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
+			procSetCursorPos.Call(uintptr(r.left), uintptr(r.top))
+
 			send(cfgTurnModDown, 0)
 			time.Sleep(32 * time.Millisecond)
-			send(mouseEventMove, cfgTurnDist)
-			time.Sleep(32 * time.Millisecond)
+			const (
+				turnDuration = 100 * time.Millisecond
+				stepInterval = 16 * time.Millisecond
+				turnSteps    = int(turnDuration / stepInterval)
+			)
+			dxPerStep := float64(cfgTurnDist) / float64(turnSteps)
+			var acc float64
+			for i := 0; i < turnSteps; i++ {
+				acc += dxPerStep
+				dx := int32(acc)
+				acc -= float64(dx)
+				send(mouseEventMove, dx)
+				time.Sleep(stepInterval)
+			}
 			send(cfgTurnModUp, 0)
+			time.Sleep(32 * time.Millisecond)
 			procSetCursorPos.Call(uintptr(p.x), uintptr(p.y))
 		} else {
 			send(mouseEventMove, cfgTurnDist)
