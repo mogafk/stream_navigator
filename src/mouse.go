@@ -165,6 +165,12 @@ func moveMouse180() {
 			state, _, _ := procGetAsyncKeyState.Call(uintptr(cfgTurnModVK))
 			userHolding := state&0x8000 != 0
 
+			var otherHolding bool
+			if cfgTurnModOtherVK != 0 {
+				s, _, _ := procGetAsyncKeyState.Call(uintptr(cfgTurnModOtherVK))
+				otherHolding = s&0x8000 != 0
+			}
+
 			const (
 				turnDuration = 100 * time.Millisecond
 				stepInterval = 16 * time.Millisecond
@@ -183,9 +189,7 @@ func moveMouse180() {
 				}
 			}
 
-			if userHolding {
-				doSteps()
-			} else {
+			doFullFlow := func() {
 				var p point
 				procGetCursorPos.Call(uintptr(unsafe.Pointer(&p)))
 				hwnd, _, _ := procGetForegroundWindow.Call()
@@ -198,6 +202,16 @@ func moveMouse180() {
 				send(cfgTurnModUp, 0)
 				time.Sleep(32 * time.Millisecond)
 				procSetCursorPos.Call(uintptr(p.x), uintptr(p.y))
+			}
+
+			switch {
+			case userHolding:
+				doSteps()
+			case otherHolding:
+				send(cfgTurnModOtherUp, 0)
+				doFullFlow()
+			default:
+				doFullFlow()
 			}
 		} else {
 			send(mouseEventMove, cfgTurnDist)
