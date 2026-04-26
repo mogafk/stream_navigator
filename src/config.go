@@ -8,16 +8,20 @@ import (
 	"time"
 )
 
+type FeatureConfig struct {
+	Feature        string   `json:"feature"`
+	DebugKey       string   `json:"debugKey"`
+	Cooldown       string   `json:"cooldown"`
+	ChatCommand    []string `json:"chatCommand"`
+	Time           string   `json:"time"`
+	Distance       int32    `json:"distance"`
+	ModificatorKey string   `json:"modificatorKey"`
+}
+
 type Config struct {
-	Debug180Key      string `json:"debug180Key"`
-	DebugStunKey     string `json:"debugStunKey"`
-	StunTime         string `json:"stunTime"`
-	TurnDistance     int32  `json:"turnDistance"`
-	TurnModificator  string `json:"turnModificator"`
-	Mute             bool   `json:"mute"`
-	Cooldown180      string `json:"cooldown180"`
-	CooldownStun     string `json:"cooldownStun"`
-	TwitchLink       string `json:"twitchLink"`
+	TwitchLink string          `json:"twitchLink"`
+	Mute       bool            `json:"mute"`
+	Features   []FeatureConfig `json:"features"`
 }
 
 var (
@@ -29,11 +33,15 @@ var (
 	cfgCooldownStun time.Duration
 	cfgTwitchChan   string
 	cfgTurnDist     int32
-	cfgTurnModDown     uint32
-	cfgTurnModUp       uint32
-	cfgTurnModVK       uint32
-	cfgTurnModOtherVK  uint32
-	cfgTurnModOtherUp  uint32
+	cfgTurnModDown  uint32
+	cfgTurnModUp    uint32
+	cfgTurnModVK    uint32
+	cfgTurnModOtherVK uint32
+	cfgTurnModOtherUp uint32
+	cfgDebug180Key  string
+	cfgDebugStunKey string
+	cfgChatCmds180  []string
+	cfgChatCmdsStun []string
 )
 
 var keyNames = map[string]uint32{
@@ -54,46 +62,62 @@ func parseConfig() error {
 		return err
 	}
 
-	turnKey, err := parseKeyName(c.Debug180Key)
-	if err != nil {
-		return err
-	}
-	stunKey, err := parseKeyName(c.DebugStunKey)
-	if err != nil {
-		return err
-	}
+	var (
+		turnKey, stunKey               uint32
+		stunTime                       = 60 * time.Second
+		cooldown180, cooldownStun      time.Duration
+		turnDist                       int32
+		turnModDown, turnModUp, turnModVK uint32
+		turnModOtherVK, turnModOtherUp uint32
+		debug180Key, debugStunKey      string
+		chatCmds180, chatCmdsStun      []string
+	)
 
-	stunTime := 60 * time.Second
-	if c.StunTime != "" {
-		if stunTime, err = time.ParseDuration(c.StunTime); err != nil {
-			return fmt.Errorf("invalid stunTime: %w", err)
+	for _, f := range c.Features {
+		switch f.Feature {
+		case "stun":
+			if stunKey, err = parseKeyName(f.DebugKey); err != nil {
+				return err
+			}
+			debugStunKey = f.DebugKey
+			chatCmdsStun = f.ChatCommand
+			if f.Time != "" {
+				if stunTime, err = time.ParseDuration(f.Time); err != nil {
+					return fmt.Errorf("stun: invalid time: %w", err)
+				}
+			}
+			if f.Cooldown != "" {
+				if cooldownStun, err = time.ParseDuration(f.Cooldown); err != nil {
+					return fmt.Errorf("stun: invalid cooldown: %w", err)
+				}
+			}
+		case "turn":
+			if turnKey, err = parseKeyName(f.DebugKey); err != nil {
+				return err
+			}
+			debug180Key = f.DebugKey
+			chatCmds180 = f.ChatCommand
+			turnDist = f.Distance
+			if f.Cooldown != "" {
+				if cooldown180, err = time.ParseDuration(f.Cooldown); err != nil {
+					return fmt.Errorf("turn: invalid cooldown: %w", err)
+				}
+			}
+			switch strings.ToUpper(f.ModificatorKey) {
+			case "PMB":
+				turnModDown, turnModUp, turnModVK = mouseEventLeftDown, mouseEventLeftUp, 0x01
+				turnModOtherVK, turnModOtherUp = 0x02, mouseEventRightUp
+			case "SMB":
+				turnModDown, turnModUp, turnModVK = mouseEventRightDown, mouseEventRightUp, 0x02
+				turnModOtherVK, turnModOtherUp = 0x01, mouseEventLeftUp
+			case "":
+				// no button held during turn
+			default:
+				return fmt.Errorf("turn: invalid modificatorKey %q — use PMB or SMB", f.ModificatorKey)
+			}
+		default:
+			return fmt.Errorf("unknown feature %q", f.Feature)
 		}
-	}
-
-	var cooldown180, cooldownStun time.Duration
-	if c.Cooldown180 != "" {
-		if cooldown180, err = time.ParseDuration(c.Cooldown180); err != nil {
-			return fmt.Errorf("invalid cooldown180: %w", err)
-		}
-	}
-	if c.CooldownStun != "" {
-		if cooldownStun, err = time.ParseDuration(c.CooldownStun); err != nil {
-			return fmt.Errorf("invalid cooldownStun: %w", err)
-		}
-	}
-
-	var turnModDown, turnModUp, turnModVK, turnModOtherVK, turnModOtherUp uint32
-	switch strings.ToUpper(c.TurnModificator) {
-	case "PMB":
-		turnModDown, turnModUp, turnModVK = mouseEventLeftDown, mouseEventLeftUp, 0x01
-		turnModOtherVK, turnModOtherUp = 0x02, mouseEventRightUp
-	case "SMB":
-		turnModDown, turnModUp, turnModVK = mouseEventRightDown, mouseEventRightUp, 0x02
-		turnModOtherVK, turnModOtherUp = 0x01, mouseEventLeftUp
-	case "":
-		// no button held during turn
-	default:
-		return fmt.Errorf("invalid turnModificator %q — use PMB or SMB", c.TurnModificator)
 	}
 
 	// All values valid — apply atomically
@@ -103,12 +127,16 @@ func parseConfig() error {
 	cfgStunTime = stunTime
 	cfgCooldown180 = cooldown180
 	cfgCooldownStun = cooldownStun
-	cfgTurnDist = c.TurnDistance
+	cfgTurnDist = turnDist
 	cfgTurnModDown = turnModDown
 	cfgTurnModUp = turnModUp
 	cfgTurnModVK = turnModVK
 	cfgTurnModOtherVK = turnModOtherVK
 	cfgTurnModOtherUp = turnModOtherUp
+	cfgDebug180Key = debug180Key
+	cfgDebugStunKey = debugStunKey
+	cfgChatCmds180 = chatCmds180
+	cfgChatCmdsStun = chatCmdsStun
 	cfgTwitchChan = channelFromURL(c.TwitchLink)
 	return nil
 }

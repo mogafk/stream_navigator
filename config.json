@@ -1,11 +1,21 @@
 {
-  "debug180Key": "F2",
-  "debugStunKey": "F3",
-  "stunTime": "10s",
-  "turnDistance": 370,
-  "turnModificator": "SMB",
+  "twitchLink": "https://www.twitch.tv/podushkamonster",
   "mute": false,
-  "cooldown180": "30s",
-  "cooldownStun": "1m",
-  "twitchLink": "https://www.twitch.tv/<change_to_your>"
+  "features": [
+    {
+      "feature": "stun",
+      "debugKey": "F3",
+      "chatCommand": ["!стан", "!тестстан"],
+      "cooldown": "1m",
+      "time": "10s"
+    },
+    {
+      "feature": "turn",
+      "debugKey": "F2",
+      "chatCommand": ["!180", "!тест180"],
+      "distance": 370,
+      "cooldown": "30s",
+      "modificatorKey": "SMB"
+    }
+  ]
 }

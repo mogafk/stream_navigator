@@ -238,10 +238,10 @@ func hookCallback(nCode int, wParam, lParam uintptr) uintptr {
 	if wParam == wmKeyDown || wParam == wmSysKeyDown {
 		ks := (*kbdllHookStruct)(unsafe.Pointer(lParam))
 		if cfgTurnKey != 0 && ks.vkCode == cfgTurnKey {
-			fmt.Printf("[keyboard] %s → 180°\n", cfg.Debug180Key)
+			fmt.Printf("[keyboard] %s → 180°\n", cfgDebug180Key)
 			moveMouse180()
 		} else if cfgStunKey != 0 && ks.vkCode == cfgStunKey {
-			fmt.Printf("[keyboard] %s → стан\n", cfg.DebugStunKey)
+			fmt.Printf("[keyboard] %s → стан\n", cfgDebugStunKey)
 			activateStun()
 		}
 	}

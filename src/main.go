@@ -10,10 +10,14 @@ import (
 	"time"
 )
 
-const (
-	chatCommand = "!180"
-	chatStunCmd = "!стан"
-)
+func matchesCmd(msg string, cmds []string) bool {
+	for _, cmd := range cmds {
+		if msg == strings.ToLower(cmd) {
+			return true
+		}
+	}
+	return false
+}
 
 var (
 	last180Nano  atomic.Int64
@@ -46,24 +50,27 @@ func main() {
 	loadConfig()
 
 	fmt.Println("Stream Navigator")
-	fmt.Printf("  turn  : key=%s | chat=%s | distance=%d px\n", keyLabel(cfg.Debug180Key), chatCommand, cfgTurnDist)
-	fmt.Printf("  стан  : key=%s | chat=%s | duration=%s\n", keyLabel(cfg.DebugStunKey), chatStunCmd, cfgStunTime)
+	fmt.Printf("  turn  : key=%s | chat=%s | distance=%d px\n", keyLabel(cfgDebug180Key), strings.Join(cfgChatCmds180, " | "), cfgTurnDist)
+	fmt.Printf("  стан  : key=%s | chat=%s | duration=%s\n", keyLabel(cfgDebugStunKey), strings.Join(cfgChatCmdsStun, " | "), cfgStunTime)
 	fmt.Printf("  twitch: #%s\n", cfgTwitchChan)
 	fmt.Println("Ctrl+C to quit")
 
 	go watchConfig()
 
 	if cfgTwitchChan != "" {
+		fmt.Printf("  cmds 180°: %v\n", cfgChatCmds180)
+		fmt.Printf("  cmds стан: %v\n", cfgChatCmdsStun)
 		go connectTwitch(cfgTwitchChan, func(username, msg string) {
-			switch strings.ToLower(strings.TrimSpace(msg)) {
-			case chatCommand:
+			normalized := strings.ToLower(strings.TrimSpace(msg))
+			switch {
+			case matchesCmd(normalized, cfgChatCmds180):
 				if !tryTrigger(&last180Nano, cfgCooldown180) {
 					fmt.Printf("[main] skip 180° by %s (cooldown %s left)\n", username, cooldownLeft(&last180Nano, cfgCooldown180))
 					return
 				}
-				fmt.Printf("[main] do 180° by %s \n", username)
+				fmt.Printf("[main] do 180° by %s\n", username)
 				moveMouse180()
-			case chatStunCmd:
+			case matchesCmd(normalized, cfgChatCmdsStun):
 				if !tryTrigger(&lastStunNano, cfgCooldownStun) {
 					fmt.Printf("[main] skip стан by %s (cooldown %s left)\n", username, cooldownLeft(&lastStunNano, cfgCooldownStun))
 					return
