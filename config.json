@@ -1,18 +1,18 @@
 {
-  "twitchLink": "https://www.twitch.tv/podushkamonster",
+  "twitchLink": "https://www.twitch.tv/<your_channel_here>",
   "mute": false,
   "features": [
     {
       "feature": "stun",
       "debugKey": "F3",
-      "chatCommand": ["!стан", "!тестстан"],
+      "chatCommand": ["!стан"],
       "cooldown": "1m",
       "time": "10s"
     },
     {
       "feature": "turn",
       "debugKey": "F2",
-      "chatCommand": ["!180", "!тест180"],
+      "chatCommand": ["!180"],
       "distance": 370,
       "cooldown": "30s",
       "modificatorKey": "SMB"

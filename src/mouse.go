@@ -139,35 +139,35 @@ func releaseAllKeys() {
 	}
 }
 
-func activateStun() {
+func activateStun(s *stunEntry) {
 	if !stunned.CompareAndSwap(false, true) {
 		return // already active
 	}
 	releaseAllKeys()
 	blockInputCh <- true
-	fmt.Printf("[stun] клавиши и кнопки мыши заблокированы на %s\n", cfgStunTime)
+	fmt.Printf("[stun] клавиши и кнопки мыши заблокированы на %s\n", s.duration)
 	playSound("sounds/stun.mp3")
-	time.AfterFunc(cfgStunTime, func() {
+	time.AfterFunc(s.duration, func() {
 		blockInputCh <- false
 		stunned.Store(false)
 		fmt.Println("[stun] клавиши и кнопки мыши разблокированы")
 	})
 }
 
-func moveMouse180() {
+func moveMouse180(t *turnEntry) {
 	playSound("sounds/180.mp3")
 	go func() {
 		send := func(flags uint32, dx int32) {
 			ev := mouseInputEvent{inputType: inputMouse, dx: dx, dwFlags: flags}
 			procSendInput.Call(1, uintptr(unsafe.Pointer(&ev)), unsafe.Sizeof(ev))
 		}
-		if cfgTurnModDown != 0 {
-			state, _, _ := procGetAsyncKeyState.Call(uintptr(cfgTurnModVK))
+		if t.modDown != 0 {
+			state, _, _ := procGetAsyncKeyState.Call(uintptr(t.modVK))
 			userHolding := state&0x8000 != 0
 
 			var otherHolding bool
-			if cfgTurnModOtherVK != 0 {
-				s, _, _ := procGetAsyncKeyState.Call(uintptr(cfgTurnModOtherVK))
+			if t.modOtherVK != 0 {
+				s, _, _ := procGetAsyncKeyState.Call(uintptr(t.modOtherVK))
 				otherHolding = s&0x8000 != 0
 			}
 
@@ -178,7 +178,7 @@ func moveMouse180() {
 			)
 
 			doSteps := func() {
-				dxPerStep := float64(cfgTurnDist) / float64(turnSteps)
+				dxPerStep := float64(t.dist) / float64(turnSteps)
 				var acc float64
 				for i := 0; i < turnSteps; i++ {
 					acc += dxPerStep
@@ -196,10 +196,10 @@ func moveMouse180() {
 				var r rect
 				procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
 				procSetCursorPos.Call(uintptr(r.left), uintptr(r.top))
-				send(cfgTurnModDown, 0)
+				send(t.modDown, 0)
 				time.Sleep(32 * time.Millisecond)
 				doSteps()
-				send(cfgTurnModUp, 0)
+				send(t.modUp, 0)
 				time.Sleep(32 * time.Millisecond)
 				procSetCursorPos.Call(uintptr(p.x), uintptr(p.y))
 			}
@@ -208,13 +208,13 @@ func moveMouse180() {
 			case userHolding:
 				doSteps()
 			case otherHolding:
-				send(cfgTurnModOtherUp, 0)
+				send(t.modOtherUp, 0)
 				doFullFlow()
 			default:
 				doFullFlow()
 			}
 		} else {
-			send(mouseEventMove, cfgTurnDist)
+			send(mouseEventMove, t.dist)
 		}
 	}()
 }
@@ -237,12 +237,19 @@ func hookCallback(nCode int, wParam, lParam uintptr) uintptr {
 
 	if wParam == wmKeyDown || wParam == wmSysKeyDown {
 		ks := (*kbdllHookStruct)(unsafe.Pointer(lParam))
-		if cfgTurnKey != 0 && ks.vkCode == cfgTurnKey {
-			fmt.Printf("[keyboard] %s → 180°\n", cfgDebug180Key)
-			moveMouse180()
-		} else if cfgStunKey != 0 && ks.vkCode == cfgStunKey {
-			fmt.Printf("[keyboard] %s → стан\n", cfgDebugStunKey)
-			activateStun()
+		for _, t := range cfgTurns {
+			if t.key != 0 && ks.vkCode == t.key {
+				fmt.Printf("[keyboard] %s → поворот %d px\n", t.debugKey, t.dist)
+				moveMouse180(t)
+				break
+			}
+		}
+		for _, s := range cfgStuns {
+			if s.key != 0 && ks.vkCode == s.key {
+				fmt.Printf("[keyboard] %s → стан\n", s.debugKey)
+				activateStun(s)
+				break
+			}
 		}
 	}
 
