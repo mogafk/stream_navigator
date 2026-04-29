@@ -1,0 +1,32 @@
+
+.number {
+  font-size: 30px;
+  animation-duration: 1s;
+  animation-name: slidein;
+  animation-fill-mode: forwards;
+  opacity: 0;
+}
+.number-1 {
+  animation-delay: 0s;
+}
+
+.number-2 {
+  animation-delay: 1s;
+}
+
+.number-3 {
+  animation-delay: 2s;
+}
+
+@keyframes slidein {
+  from {
+    font-size: 30px;
+    opacity: 1;
+  }
+
+  to {
+    font-size: 200px;
+    opacity: 0;
+    display: none;
+  }
+}

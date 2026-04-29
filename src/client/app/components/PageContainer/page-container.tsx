@@ -7,9 +7,12 @@ interface Props {
 export const PageContainer: React.FC<Props> = ({ children }) => {
   return (
     <div className="page-container">
-        <div className="page-content">
-            {children}
-        </div>
+      <div className="header">
+        stream navigator
+      </div>
+      <div>
+        {children}
+      </div>
     </div>
   );
 }

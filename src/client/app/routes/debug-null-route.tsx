@@ -7,6 +7,6 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export default function DebugNull() {
+export default function DebugNullRoute() {
   return null;
 }

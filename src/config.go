@@ -9,46 +9,59 @@ import (
 	"time"
 )
 
+type RootConfig struct {
+	TwitchLink   string `json:"twitchLink"`
+	ActiveConfig string `json:"activeConfig"`
+}
+
+type ObsLayoutConfig struct {
+	Duration string `json:"duration"`
+}
+
 type FeatureConfig struct {
-	Feature        string   `json:"feature"`
-	DebugKey       string   `json:"debugKey"`
-	Cooldown       string   `json:"cooldown"`
-	ChatCommand    []string `json:"chatCommand"`
-	Time           string   `json:"time"`
-	Distance       int32    `json:"distance"`
-	ModificatorKey string   `json:"modificatorKey"`
+	Feature        string          `json:"feature"`
+	DebugKey       string          `json:"debugKey"`
+	Cooldown       string          `json:"cooldown"`
+	ChatCommand    []string        `json:"chatCommand"`
+	Time           string          `json:"time"`
+	Distance       int32           `json:"distance"`
+	ModificatorKey string          `json:"modificatorKey"`
+	ObsLayout      ObsLayoutConfig `json:"obsLayout"`
 }
 
 type Config struct {
-	TwitchLink string          `json:"twitchLink"`
 	Mute       bool            `json:"mute"`
+	ServerPort int             `json:"serverPort"`
 	Features   []FeatureConfig `json:"features"`
 }
 
 type turnEntry struct {
-	key        uint32
-	debugKey   string
-	dist       int32
-	cooldown   time.Duration
-	chatCmds   []string
-	modDown    uint32
-	modUp      uint32
-	modVK      uint32
-	modOtherVK uint32
-	modOtherUp uint32
-	lastNano   atomic.Int64
+	key           uint32
+	debugKey      string
+	dist          int32
+	cooldown      time.Duration
+	chatCmds      []string
+	modDown       uint32
+	modUp         uint32
+	modVK         uint32
+	modOtherVK    uint32
+	modOtherUp    uint32
+	obsLayoutDur  time.Duration
+	lastNano      atomic.Int64
 }
 
 type stunEntry struct {
-	key      uint32
-	debugKey string
-	duration time.Duration
-	cooldown time.Duration
-	chatCmds []string
-	lastNano atomic.Int64
+	key          uint32
+	debugKey     string
+	duration     time.Duration
+	cooldown     time.Duration
+	chatCmds     []string
+	obsLayoutDur time.Duration
+	lastNano     atomic.Int64
 }
 
 var (
+	rootCfg       RootConfig
 	cfg           Config
 	cfgTwitchChan string
 	cfgTurns      []*turnEntry
@@ -62,13 +75,25 @@ var keyNames = map[string]uint32{
 }
 
 func parseConfig() error {
-	data, err := os.ReadFile("config.json")
+	rootData, err := os.ReadFile("config.json")
 	if err != nil {
-		return err
+		return fmt.Errorf("config.json: %w", err)
+	}
+	var root RootConfig
+	if err = json.Unmarshal(rootData, &root); err != nil {
+		return fmt.Errorf("config.json: %w", err)
+	}
+	if root.ActiveConfig == "" {
+		return fmt.Errorf("config.json: activeConfig is empty")
+	}
+
+	activeData, err := os.ReadFile(root.ActiveConfig)
+	if err != nil {
+		return fmt.Errorf("%s: %w", root.ActiveConfig, err)
 	}
 	var c Config
-	if err = json.Unmarshal(data, &c); err != nil {
-		return err
+	if err = json.Unmarshal(activeData, &c); err != nil {
+		return fmt.Errorf("%s: %w", root.ActiveConfig, err)
 	}
 
 	var turns []*turnEntry
@@ -101,6 +126,11 @@ func parseConfig() error {
 			default:
 				return fmt.Errorf("turn: invalid modificatorKey %q — use PMB or SMB", f.ModificatorKey)
 			}
+			if f.ObsLayout.Duration != "" {
+				if t.obsLayoutDur, err = time.ParseDuration(f.ObsLayout.Duration); err != nil {
+					return fmt.Errorf("turn: invalid obsLayout.duration: %w", err)
+				}
+			}
 			turns = append(turns, t)
 
 		case "stun":
@@ -122,6 +152,11 @@ func parseConfig() error {
 					return fmt.Errorf("stun: invalid cooldown: %w", err)
 				}
 			}
+			if f.ObsLayout.Duration != "" {
+				if s.obsLayoutDur, err = time.ParseDuration(f.ObsLayout.Duration); err != nil {
+					return fmt.Errorf("stun: invalid obsLayout.duration: %w", err)
+				}
+			}
 			stuns = append(stuns, s)
 
 		default:
@@ -130,10 +165,11 @@ func parseConfig() error {
 	}
 
 	// All values valid — apply atomically
+	rootCfg = root
 	cfg = c
 	cfgTurns = turns
 	cfgStuns = stuns
-	cfgTwitchChan = channelFromURL(c.TwitchLink)
+	cfgTwitchChan = channelFromURL(root.TwitchLink)
 	return nil
 }
 
@@ -152,19 +188,31 @@ func reloadConfig() {
 	fmt.Println("[config] reloaded")
 }
 
+// watchConfig polls config.json and the active config file every second,
+// reloading when either changes.
 func watchConfig() {
-	info, err := os.Stat("config.json")
-	if err != nil {
-		return
-	}
-	lastMod := info.ModTime()
-	for range time.Tick(time.Second) {
-		info, err := os.Stat("config.json")
-		if err != nil || !info.ModTime().After(lastMod) {
-			continue
+	modTime := func(path string) time.Time {
+		info, err := os.Stat(path)
+		if err != nil {
+			return time.Time{}
 		}
-		lastMod = info.ModTime()
-		reloadConfig()
+		return info.ModTime()
+	}
+
+	lastRoot   := modTime("config.json")
+	lastActive := modTime(rootCfg.ActiveConfig)
+
+	for range time.Tick(time.Second) {
+		rootChanged   := modTime("config.json").After(lastRoot)
+		activeChanged := modTime(rootCfg.ActiveConfig).After(lastActive)
+
+		if rootChanged || activeChanged {
+			lastRoot   = modTime("config.json")
+			lastActive = modTime(rootCfg.ActiveConfig)
+			reloadConfig()
+			// update active path in case activeConfig field changed
+			lastActive = modTime(rootCfg.ActiveConfig)
+		}
 	}
 }
 

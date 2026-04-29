@@ -1,0 +1,16 @@
+.layout {
+    position: absolute;
+    left: 0px;
+    right: 0px;
+    top: 0px;
+    bottom: 0px;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.layout_capture {
+    color: red;
+    font-size: 200px;
+}

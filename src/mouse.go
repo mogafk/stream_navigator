@@ -145,16 +145,19 @@ func activateStun(s *stunEntry) {
 	}
 	releaseAllKeys()
 	blockInputCh <- true
+	broker.publish(fmt.Sprintf(`{"type":"stun","active":true,"duration":%d}`, s.obsLayoutDur.Milliseconds()))
 	fmt.Printf("[stun] клавиши и кнопки мыши заблокированы на %s\n", s.duration)
 	playSound("sounds/stun.mp3")
 	time.AfterFunc(s.duration, func() {
 		blockInputCh <- false
 		stunned.Store(false)
+		broker.publish(fmt.Sprintf(`{"type":"stun","active":false,"duration":%d}`, s.obsLayoutDur.Milliseconds()))
 		fmt.Println("[stun] клавиши и кнопки мыши разблокированы")
 	})
 }
 
 func moveMouse180(t *turnEntry) {
+	broker.publish(fmt.Sprintf(`{"type":"turn","duration":%d}`, t.obsLayoutDur.Milliseconds()))
 	playSound("sounds/180.mp3")
 	go func() {
 		send := func(flags uint32, dx int32) {

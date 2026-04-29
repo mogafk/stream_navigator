@@ -29,6 +29,10 @@ func cooldownLeft(nano int64, cooldown time.Duration) time.Duration {
 func main() {
 	loadConfig()
 
+	if cfg.ServerPort > 0 {
+		startServer(cfg.ServerPort)
+	}
+
 	fmt.Println("Stream Navigator")
 	for _, t := range cfgTurns {
 		fmt.Printf("  turn  : key=%s | chat=%s | distance=%d px\n", keyLabel(t.debugKey), strings.Join(t.chatCmds, " | "), t.dist)
@@ -82,6 +86,7 @@ func main() {
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		<-c
 		stopKeyboardHook()
+		stopServer()
 		os.Exit(0)
 	}()
 

@@ -1,0 +1,7 @@
+.content {
+    display: flex;
+    margin-top: 8px;
+}
+.content_left {
+    width: 240px;
+}

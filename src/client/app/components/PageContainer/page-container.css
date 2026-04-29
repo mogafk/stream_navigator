@@ -1,9 +1,10 @@
 
 .page-container {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
 }
-.page-content {
-    width: 900px;
-    background: red;
+
+.header {
+    border-bottom: 1px solid black;
+    font-size: 24px;
 }

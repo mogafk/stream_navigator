@@ -1,0 +1,27 @@
+{
+  "mute": false,
+  "serverPort": 8081,
+  "features": [
+    {
+      "feature": "stun",
+      "debugKey": "F3",
+      "chatCommand": ["!стан"],
+      "cooldown": "1m",
+      "time": "10s", 
+      "obsLayout": {
+        "duration": "10s"
+      }
+    },
+    {
+      "feature": "turn",
+      "debugKey": "F2",
+      "chatCommand": ["!180"],
+      "distance": 370,
+      "cooldown": "30s",
+      "modificatorKey": "SMB",
+      "obsLayout": {
+        "duration": "1s"
+      }
+    }
+  ]
+}
