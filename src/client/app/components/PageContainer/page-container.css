@@ -1,0 +1,9 @@
+
+.page-container {
+    display: flex;
+    justify-content: center;
+}
+.page-content {
+    width: 900px;
+    background: red;
+}

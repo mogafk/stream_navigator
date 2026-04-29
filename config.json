@@ -15,7 +15,7 @@
       "chatCommand": ["!180"],
       "distance": 370,
       "cooldown": "30s",
-      "modificatorKey": "SMB"
+      "modificatorKey": ""
     }
   ]
 }
